@@ -1,0 +1,125 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: &app kestra
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: kestra
+      version: 0.20.13
+      sourceRef:
+        kind: HelmRepository
+        name: kestra
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values:
+    executable: /app/kestra
+    deployments:
+      standalone:
+        enabled: true
+        kind: Deployment
+        command: "server standalone{{ if $.Values.deployments.standalone.workerThreads }} --worker-thread={{ .Values.deployments.standalone.workerThreads }}{{ end }}"
+        terminationGracePeriodSeconds: 60
+        readinessProbe: {}
+        livenessProbe: {}
+        startupProbe: {}
+        # By default, we start a number of threads of two times the number of available processors, use 'workerThreads' to configure a different value.
+        #workerThreads: 128
+      worker: 
+        enabled: false
+        kind: Deployment
+      scheduler: 
+        enabled: false
+        kind: Deployment
+      indexer: 
+        enabled: false
+        kind: Deployment
+      executor: 
+        enabled: false
+        kind: Deployment
+      webserver: 
+        enabled: false
+        kind: Deployment
+    postgresql:
+      enabled: true
+    minio:
+      enabled: true
+    elasticsearch:
+      enabled: false
+    kafka:
+      enabled: false
+    dind:
+      enabled: false
+    logging:
+      level: INFO
+    security:
+      authentication:
+        enabled: true
+        users:
+          - username: admin
+            password: admin
+            roles:
+              - ADMIN
+    ingress:
+      enabled: true
+      className: "internal"
+      hosts:
+        - host: kestra.${SECRET_DOMAIN}
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+    resources:
+      requests:
+        memory: 1024Mi
+        cpu: 250m
+      limits:
+        memory: 4096Mi
+        cpu: 2000m
+
+    readinessProbe:
+      enabled: true
+      path: /health
+      port: management
+      initialDelaySeconds: 0
+      periodSeconds: 5
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+      httpGetEnabled: true
+      httpGetExtra: {}
+
+    livenessProbe:
+      enabled: true
+      path: /health
+      port: management
+      initialDelaySeconds: 0
+      periodSeconds: 5
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+      httpGetEnabled: true
+      httpGetExtra: {}
+
+    startupProbe:
+      enabled: true
+      path: /health
+      port: management
+      initialDelaySeconds: 1
+      periodSeconds: 1
+      timeoutSeconds: 1
+      successThreshold: 1
+      failureThreshold: 120
+      httpGetEnabled: true
+      httpGetExtra: {}
